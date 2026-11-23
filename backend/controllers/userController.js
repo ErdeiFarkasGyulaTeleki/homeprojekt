@@ -94,14 +94,14 @@ const UserController = {
 
       const accessToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
-        process.env.JWT_ACCESS_SECRET,
-        { expiresIn: '15m' }
+        process.env.ACCESS_TOKEN_SECRET,
+        { expiresIn: process.env.ACCESS_TOKEN_EXPIRES }
       );
 
       const refreshToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
-        process.env.JWT_REFRESH_SECRET,
-        { expiresIn: '7d' }
+        process.env.REFRESH_TOKEN_SECRET,
+        { expiresIn: process.env.REFRESH_TOKEN_EXPIRES }
       );
 
       res.cookie('refreshToken', refreshToken, {
@@ -130,7 +130,89 @@ const UserController = {
       console.error('Error during login:', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
+  },
+
+  async refreshToken(req, res) {
+    const token = req.cookies?.refreshToken;
+
+    if (!token) {
+      return res.status(401).json({ error: 'Hiányzó refresh token' });
+    }
+
+    try {
+      const user = await userModel.getByRefreshToken(token);
+      if (!user) {
+        return res.status(403).json({ error: 'Érvénytelen refresh token' });
+      }
+
+      jwt.verify(token, process.env.JWT_REFRESH_SECRET, async (err, decoded) => {
+        if (err || user.id !== decoded.id) {
+          return res.status(403).json({ error: 'Lejárt vagy érvénytelen refresh token' });
+        }
+
+        const newAccessToken = jwt.sign(
+          { id: user.id, email: user.email, role: user.role },
+          process.env.JWT_ACCESS_SECRET,
+          { expiresIn: '15m' }
+        );
+
+        res.cookie('accessToken', newAccessToken, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'Strict',
+          maxAge: 15 * 60 * 1000
+        });
+
+        res.status(200).json({ accessToken: newAccessToken });
+      });
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  },
+
+  async logout(req, res) {
+    const token = req.cookies?.refreshToken;
+
+    try {
+      if (token) {
+        const user = await userModel.getByRefreshToken(token);
+        if (user) {
+          await userModel.updateRefreshToken(user.id, null);
+        }
+      }
+
+      const cookieOptions = {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Strict'
+      };
+
+      res.clearCookie('refreshToken', cookieOptions);
+      res.clearCookie('accessToken', cookieOptions);
+
+      res.status(200).json({ message: 'Sikeres kijelentkezés' });
+    } catch (error) {
+      console.error('Error during logout:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  },
+
+  async getProfile(req, res) {
+    try {
+      const user = await userModel.getById(req.user.id);
+
+      if (!user) {
+        return res.status(404).json({ error: 'Felhasználó nem található' });
+      }
+
+      res.status(200).json(user);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
   }
+
 };
 
 export default UserController;

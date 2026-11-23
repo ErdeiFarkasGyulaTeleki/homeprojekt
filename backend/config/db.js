@@ -7,7 +7,7 @@ const poolConfig = {
   database: process.env.DB_NAME || 'mydatabase',
 
   waitForConnections: true,
-  connenctionLimit: 10,
+  connectionLimit: 10,
   queueLimit: 0
 };
 
