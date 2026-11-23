@@ -28,6 +28,22 @@ const UserModel = {
       [name, email, password, role]
     );
     return { id: results.insertId, name, email, role };
+  },
+
+  async updateRefreshToken(id, refreshToken) {
+    const [results] = await pool.query(
+      'UPDATE users SET refresh_token = ? WHERE id = ?',
+      [refreshToken, id]
+    );
+    return results.affectedRows > 0;
+  },
+
+  async getByRefreshToken(refreshToken) {
+    const [results] = await pool.query(
+      'SELECT * FROM users WHERE refresh_token = ?',
+      [refreshToken]
+    );
+    return results;
   }
 };
 
