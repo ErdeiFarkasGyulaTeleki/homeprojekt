@@ -42,10 +42,8 @@ const UserController = {
     }
 
     if (password.length < 8) {
-      returnres.status(400).json({ error: 'Rövid jelszó' });
+      return res.status(400).json({ error: 'Rövid jelszó' });
     }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
 
     try {
       const emailUser = await userModel.getByEmail(email);
@@ -54,17 +52,18 @@ const UserController = {
         return res.status(409).json({ error: 'Foglalt email cím' });
       }
 
+      const hashedPassword = await bcrypt.hash(password, 10);
+
       const newUser = await userModel.create({
-        name: name,
-        email: email,
+        name,
+        email,
         password: hashedPassword
       });
 
       res.status(201).json(newUser);
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
-        res.status(400).json({ error: 'Ez az email cím már létezik' });
-        return;
+        return res.status(409).json({ error: 'Ez az email cím már létezik' });
       }
       console.error('Error creating user:', error);
       res.status(500).json({ error: 'Internal Server Error' });
@@ -74,15 +73,15 @@ const UserController = {
   async login(req, res) {
     const { email, password } = req.body;
 
-    if (!email) {
-      return res.status(400);
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Hiányzó email vagy jelszó' });
     }
 
     try {
       const user = await userModel.getByEmail(email);
 
       if (!user) {
-        return res.status(404).json({ error: 'Nincs ilyen felhasználó' });
+        return res.status(401).json({ error: 'Hibás email vagy jelszó' });
       }
 
       const isPasswordCorrect = await bcrypt.compare(password, user.password);
@@ -94,27 +93,15 @@ const UserController = {
       await userModel.updateLastLogin(user.id);
 
       const accessToken = jwt.sign(
-        {
-          id: user.id,
-          email: user.email,
-          role: user.role
-        },
+        { id: user.id, email: user.email, role: user.role },
         process.env.JWT_ACCESS_SECRET,
-        {
-          expiresIn: '15m'
-        }
+        { expiresIn: '15m' }
       );
 
       const refreshToken = jwt.sign(
-        {
-          id: user.id,
-          email: user.email,
-          role: user.role
-        },
+        { id: user.id, email: user.email, role: user.role },
         process.env.JWT_REFRESH_SECRET,
-        {
-          expiresIn: '7d'
-        }
+        { expiresIn: '7d' }
       );
 
       res.cookie('refreshToken', refreshToken, {
@@ -132,8 +119,8 @@ const UserController = {
       });
 
       res.status(200).json({
-        'accessToken': accessToken,
-        'user': {
+        accessToken,
+        user: {
           id: user.id,
           name: user.name,
           email: user.email
@@ -144,4 +131,6 @@ const UserController = {
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
-}
+};
+
+export default UserController;
