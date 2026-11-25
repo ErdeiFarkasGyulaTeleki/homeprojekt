@@ -2,23 +2,18 @@ import pool from "../config/db.js";
 
 const UserModel = {
   async getAll() {
-    const [results] = await pool.query('SELECT id, name, email, role, lastlogin FROM users');
+    const [results] = await pool.query('SELECT id, name, email, role, created_at FROM users');
     return results;
   },
 
   async getById(id) {
-    const [results] = await pool.query('SELECT id, name, email, role, lastlogin FROM users WHERE id = ?', [id]);
+    const [results] = await pool.query('SELECT id, name, email, role, created_at FROM users WHERE id = ?', [id]);
     return results[0];
   },
 
   async getByEmail(email) {
     const [results] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     return results[0];
-  },
-
-  async updateLastLogin(id) {
-    const [results] = await pool.query('UPDATE users SET lastlogin = NOW() WHERE id = ?', [id]);
-    return results.affectedRows > 0;
   },
 
   async create(user) {
@@ -43,7 +38,7 @@ const UserModel = {
       'SELECT * FROM users WHERE refresh_token = ?',
       [refreshToken]
     );
-    return results;
+    return results[0];
   }
 };
 
